@@ -1,0 +1,81 @@
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    // 1. YOUR CONFIGURATION
+    const SUPABASE_URL = 'https://your-project-id.supabase.co';
+    const SUPABASE_KEY = 'your-anon-key-here';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const desserts = [
+        "Alfajores", "ANZAC Biscuits", "Apple Pie", "Arroz con Leche", "Baklava", 
+        "Banana Fritters", "Banana Split", "Basbousa", "Black Forest Cake", "Brigadeiro", 
+        "Brownies", "Cannoli", "Cassava Cake", "Cheesecake", "Chocolate Chip Cookies", 
+        "Churros with Chocolate", "Churros with Dulce de Leche", "Cocadas", "Crème brûlée", 
+        "Donuts", "Dorayaki", "Dulce de Leche", "Eton Mess", "Flan", "Gulab Jamun", 
+        "Halo-Halo", "Haupia", "Ice Cream", "Key Lime Pie", "Knafeh", "Koeksisters", 
+        "Lamingtons", "Malva Pudding", "Mango Sticky Rice", "Mazamorra Morada", "Mochi", 
+        "Nanaimo Bars", "Pastel de Nata", "Pavlova", "Pavlova with Kiwi Fruit", "Pecan Pie", 
+        "Pumpkin Pie", "Rasgulla", "Sacher Torte", "Sago Pudding", "Sesame Balls", 
+        "Sticky Toffee Pudding", "Tiramisu", "Tres Leches Cake", "Turkish Delight"
+    ];
+
+    let currentPair = [];
+
+    // 2. FETCH REAL-TIME RESULTS
+    async function updateResults() {
+        const { data, error } = await supabase
+            .from('dessert_battles')
+            .select('*')
+            .order('votes', { ascending: false });
+
+        if (error) return console.error(error);
+
+        const list = document.getElementById('resultsList');
+        list.innerHTML = data
+            .filter(item => item.votes > 0)
+            .map(item => `
+                <div class="result-item">
+                    <span>${item.name}</span>
+                    <strong>${item.votes} votes</strong>
+                </div>
+            `).join('');
+    }
+
+    // 3. VOTE LOGIC (SERVER-SIDE INCREMENT)
+    async function vote(index) {
+        const winner = currentPair[index];
+        
+        // This command tells the database to increment the vote count by 1
+        const { error } = await supabase.rpc('increment_vote', { row_name: winner });
+
+        if (error) {
+            // Fallback if you haven't set up the RPC function yet
+            const { data } = await supabase.from('dessert_battles').select('votes').eq('name', winner).single();
+            await supabase.from('dessert_battles').update({ votes: data.votes + 1 }).eq('name', winner);
+        }
+
+        updateResults();
+        renderBattle();
+    }
+
+    function renderBattle() {
+        const shuffled = [...desserts].sort(() => 0.5 - Math.random());
+        currentPair = [shuffled[0], shuffled[1]];
+        document.getElementById('name-a').innerText = currentPair[0];
+        document.getElementById('name-b').innerText = currentPair[1];
+    }
+
+    function toggleDrawer() {
+        document.getElementById('resultsDrawer').classList.toggle('open');
+        if (document.getElementById('resultsDrawer').classList.contains('open')) {
+            updateResults();
+        }
+    }
+
+    // Initialize
+    renderBattle();
+    updateResults();
+    
+    // Refresh results every 10 seconds automatically
+    setInterval(updateResults, 10000);
+</script>
